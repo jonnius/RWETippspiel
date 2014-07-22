@@ -81,6 +81,7 @@ import java.util.jar.JarOutputStream;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
@@ -111,7 +112,7 @@ public class Tippspiel extends JFrame {
 	private static final long serialVersionUID = 1L;
 	static boolean hintergrund = false;
 	static File d_konfig, d_wolke, d_autostart;
-	static String kicker, jahr, name = null;
+	static String kicker, jahre[], saison, name = null;
 	
 	static Spiel spiele[], tipps[][];
 	static String namen[];
@@ -200,7 +201,7 @@ public class Tippspiel extends JFrame {
 			System.out.println("Fehler beim Lesen der Konfigurationsdatei "+d_konfig.getAbsolutePath());
 		}
 		
-		jahr = konfig.getProperty("jahr", "2013-14");		
+		saison = konfig.getProperty("jahr", "2014-15");
 		kicker = konfig.getProperty("kicker", "http://www.kicker.de/news/fussball/3liga/vereine/3-liga/{jahr}/rot-weiss-erfurt-61/vereinstermine.html");
 		erinnern = Integer.parseInt(konfig.getProperty("erinnern", "3"));
 		setzeAutostart(erinnern > 0, true);
@@ -231,7 +232,7 @@ public class Tippspiel extends JFrame {
 		try {
 			konfig.setProperty("erinnern", Integer.toString(erinnern));
 			konfig.setProperty("wolke", d_wolke.getAbsolutePath());
-			konfig.setProperty("jahr", jahr);
+			konfig.setProperty("jahr", saison);
 			konfig.setProperty("kicker", kicker);
 			if(!admin || admin_spieler == null) konfig.setProperty("name", name);
 			
@@ -343,13 +344,21 @@ public class Tippspiel extends JFrame {
 		spiele = new Spiel[38];
 		for(int i = 0; i<spiele.length; i++)  spiele[i] = new Spiel();
 		
-		String html = readHTML(kicker.replace("{jahr}", jahr));
+		String html;
+		
+		int ja = new GregorianCalendar().get(GregorianCalendar.YEAR);
+		if(new GregorianCalendar().get(GregorianCalendar.MONTH) < 6) ja--;		
+		jahre = new String[2];
+		jahre[0] = Integer.toString(ja)+"-"+Integer.toString((ja+1)%1000);
+		jahre[1] = Integer.toString(ja-1)+"-"+Integer.toString((ja)%1000);
+		
+		html = readHTML(kicker.replace("{jahr}", saison));
 		if(html.equals("")) {
 			fehler = "<html>Konnte Daten nicht mit kicker.de abgleichen.<br>Möglicherweise besteht keine Internetverbindung.</html>";
-			System.out.println("Adresse: "+kicker.replace("{jahr}", jahr)+" nicht erreichbar.");
+			System.out.println("Adresse: "+kicker.replace("{jahr}", saison)+" nicht erreichbar.");
 		} else {
 			if(html.contains("Es sind zur Zeit keine Daten vorhanden.")) {
-				if(!hintergrund) JOptionPane.showMessageDialog(null, "Für die gewählte Saison "+jahr+" sind keine Daten auf kicker.de vorhanden.\n" +
+				if(!hintergrund) JOptionPane.showMessageDialog(null, "Für die gewählte Saison "+saison+" sind keine Daten auf kicker.de vorhanden.\n" +
 						"In der Konfigdatei kann eine andere Saison eingetragen werden:\n"+d_konfig.getAbsolutePath());
 				System.exit(1);
 			}
@@ -584,6 +593,7 @@ public class Tippspiel extends JFrame {
 	private JLabel sl_info, sl_spt;
 	private JCheckBox cb_erinnern;
 	private JTextField tf_komm;
+	private JComboBox<String> co_saison;
 	
 	private Aktualisierer aktualisierer;
 	
@@ -625,7 +635,6 @@ public class Tippspiel extends JFrame {
 	}
 	
 	private void initErgebnisse() {
-		//daten.setLayout(new BorderLayout());
 		JScrollPane sc_daten, sc_verlauf;
 		daten.setLeftComponent(sc_daten = new JScrollPane(historie = new JPanel()));
 		sc_daten.setViewportBorder(null);
@@ -670,10 +679,11 @@ public class Tippspiel extends JFrame {
 			}
 		});
 		
-		aktualisiere();		
+		aktualisiereAnzeige();		
 	}
 	
-	public void aktualisiere() {
+	// Alle Anzeigebereiche aktualisieren
+	public void aktualisiereAnzeige() {
 		aktualisiereGraph();
 		aktualisiereErgebnisse();
 		aktualisiereTabelle();
@@ -866,7 +876,9 @@ public class Tippspiel extends JFrame {
 					}
 				}
 			}
-		}
+		}		
+
+		sl_spieltag.setValue(spt_anzeige);
 		
 		historie.removeAll();
 		historie.add(hist);
@@ -1095,7 +1107,7 @@ public class Tippspiel extends JFrame {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				try {
-					Desktop.getDesktop().browse(new URI(kicker.replace("{jahr}", jahr)));
+					Desktop.getDesktop().browse(new URI(kicker.replace("{jahr}", saison)));
 				} catch (Exception e1) {
 					e1.printStackTrace();
 					JOptionPane.showMessageDialog(Tippspiel.this, "Browser konnte nicht aufgerufen werden.");
@@ -1104,7 +1116,7 @@ public class Tippspiel extends JFrame {
 		});
 		
 		//Wolkenpfad
-		einst_wolkenpfad.setLayout(new GridLayout(1,1));
+		einst_wolkenpfad.setLayout(new GridLayout(2,1));
 		JButton bu_wolke;
 		einst_wolkenpfad.add(bu_wolke = new JButton("Tippspielverzeichnis ändern"));
 		bu_wolke.addActionListener(new ActionListener() {				
@@ -1126,10 +1138,43 @@ public class Tippspiel extends JFrame {
 						if((k = new File(alt,name+".tipps")).exists()) k.renameTo(new File(d_wolke,name+".tipps"));
 					}
 					aktualisiereDateien();
-					aktualisiere();
+					aktualisiereAnzeige();
 				}
 			}
 		});
+		einst_wolkenpfad.add(co_saison = new JComboBox<String>(jahre));
+		co_saison.setSelectedItem(saison);
+		co_saison.addActionListener(new ActionListener() {				
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				String neu_saison = (String) Tippspiel.this.co_saison.getSelectedItem();
+				if(!neu_saison.equals(saison)) {
+					// Alte Daten sichern
+					File sichern = new File(d_wolke,saison);
+					sichern.mkdirs();
+					new File(d_wolke,"Ergebnisse").renameTo(new File(sichern,"Ergebnisse"));
+					for(String s:namen) {
+						new File(d_wolke,s+".tipps").renameTo(new File(sichern,s+".tipps"));
+						new File(d_wolke,s+".chat").renameTo(new File(sichern,s+".chat"));
+					}
+					
+					// Ggf. gesicherte Daten wiederherstellen
+					File wiederherstellen = new File(d_wolke,neu_saison);
+					if(wiederherstellen.isDirectory()) {
+						for(File f:wiederherstellen.listFiles()) {
+							if(f.isFile()) f.renameTo(new File(d_wolke,f.getName()));
+						}
+					}
+					
+					saison = neu_saison;
+					speicherKonfig();
+					aktualisiereDateien();
+					spt_anzeige = spt_aktuell;
+					aktualisiereAnzeige();
+				}
+			}
+		});
+		
 		
 		//Intervall
 		einst_intervall.add(cb_erinnern = new JCheckBox("Erinnern", erinnern > 0));
@@ -1564,7 +1609,7 @@ class Aktualisierer extends Thread {
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
-			tippspiel.aktualisiere();
+			tippspiel.aktualisiereAnzeige();
 			if(i++ >= 60) {
 				Tippspiel.aktualisiereDateien();
 				i = 0;
