@@ -127,6 +127,8 @@ public class Tippspiel extends JFrame {
 	static String fehler = "";
 	static TreeMap<GregorianCalendar,String> chat_eigen = new TreeMap<GregorianCalendar,String>(), chat_alle = new TreeMap<GregorianCalendar,String>();
 	
+	static int spieltage = 34;
+
 	//Administrator darf auch im Nachhinein seine Tipps ändern
 	static boolean admin = false;
 	//Admin startet als dieser Spieler, falls null, wird Spieler aus der Konfig benutzt
@@ -201,8 +203,8 @@ public class Tippspiel extends JFrame {
 			System.out.println("Fehler beim Lesen der Konfigurationsdatei "+d_konfig.getAbsolutePath());
 		}
 		
-		saison = konfig.getProperty("jahr", "2014-15");
-		kicker = konfig.getProperty("kicker", "http://www.kicker.de/news/fussball/3liga/vereine/3-liga/{jahr}/rot-weiss-erfurt-61/vereinstermine.html");
+		saison = konfig.getProperty("jahr", "2022-23");
+		kicker = konfig.getProperty("kicker", "https://www.kicker.de/rot-weiss-erfurt/spielplan/regionalliga-nordost/{jahr}");
 		erinnern = Integer.parseInt(konfig.getProperty("erinnern", "3"));
 		setzeAutostart(erinnern > 0, true);
 				
@@ -338,10 +340,10 @@ public class Tippspiel extends JFrame {
 	 * Ergebnisse aus dem Internet herunterladen und Dateien aktualisieren
 	 */
 	static void aktualisiereDateien() {
-		Spiel spiele_kicker[] = new Spiel[38];
+		Spiel spiele_kicker[] = new Spiel[spieltage];
 		boolean heruntergeladen = false;
 		
-		spiele = new Spiel[38];
+		spiele = new Spiel[spieltage];
 		for(int i = 0; i<spiele.length; i++)  spiele[i] = new Spiel();
 		
 		String html;
@@ -365,9 +367,8 @@ public class Tippspiel extends JFrame {
 			
 			int i1 = 0, i2 = 0;
 			for(int i = 1; i <= spiele_kicker.length; i++) {
-				i1 = html.indexOf("<td>Spt."+i+"</td>");
-				i1 = html.substring(0, i1).lastIndexOf("<td class=\"first\">");
-				i2 = html.substring(i1).indexOf("<td class=\"aligncenter last\">")+i1;
+				i1 = html.indexOf("RL Nordost, "+i+". Spt");
+				i2 = html.substring(i1).indexOf("class=\"kick__table--hide-mobile\"")+i1;
 				spiele_kicker[i-1] = new Spiel(html.substring(i1, i2));
 			}
 			heruntergeladen = true;
@@ -378,7 +379,7 @@ public class Tippspiel extends JFrame {
 		//Ergebnisdatei laden
 		try {
 			ObjectInputStream lesen = new ObjectInputStream(new FileInputStream(new File(d_wolke,"Ergebnisse")));
-			spiele = new Spiel[38];
+			spiele = new Spiel[spieltage];
 			for(int i = 0; i<spiele.length; i++) {
 				spiele[i] = (Spiel) lesen.readObject();
 				aenderung |= heruntergeladen && !spiele[i].equals(spiele_kicker[i]);
@@ -405,7 +406,7 @@ public class Tippspiel extends JFrame {
 			}
 		}
 		
-		for(int i = 0; i < 38; i++) {
+		for(int i = 0; i < spieltage; i++) {
 			spt_aktuell = i+1;
 			if(!spiele[i].mitErgebnis()) break;
 		}
@@ -417,7 +418,7 @@ public class Tippspiel extends JFrame {
 			if(dat[i].isFile() && dat[i].getName().endsWith(".tipps") && !dat[i].getName().equals(name+".tipps")) z++;
 		}
 		
-		tipps = new Spiel[z+1][38];
+		tipps = new Spiel[z+1][spieltage];
 		namen = new String[z+1];
 		rangliste = new Spieler[0];
 		namen[0] = name;
@@ -439,7 +440,7 @@ public class Tippspiel extends JFrame {
 	}
 	
 	static Spiel[] ladeTipps(File f) {
-		Spiel t[] = new Spiel[38];
+		Spiel t[] = new Spiel[spieltage];
 		for(int i = 0; i<t.length; i++) {
 			t[i] = spiele[i].gibLeerenTipp();
 		}
@@ -655,7 +656,7 @@ public class Tippspiel extends JFrame {
 		verl_spieltag.setLayout(new BorderLayout());
 		verl_spieltag.add(sl_spt = new JLabel(" Spieltag "+spt_anzeige), BorderLayout.WEST);
 		sl_spt.setFont(f_rangliste);
-		verl_spieltag.add(sl_spieltag = new JSlider(1, 38), BorderLayout.CENTER);
+		verl_spieltag.add(sl_spieltag = new JSlider(1, spieltage), BorderLayout.CENTER);
 		sl_spieltag.setMinorTickSpacing(1);
 //		sl_spieltag.setMajorTickSpacing(37);
 //		sl_spieltag.setPaintLabels(true);
@@ -1076,7 +1077,7 @@ public class Tippspiel extends JFrame {
 		});
 		
 		JButton bu_copyright;
-		bu_copyright = new JButton("<html>© Copyright 2014 Jonatan Zeidler<br>jonatan_zeidler@gmx.de</html>");
+		bu_copyright = new JButton("<html>© Copyright 2014-2022 Jonatan Zeidler<br>jonatan_zeidler@gmx.de</html>");
 		bu_copyright.setFont(f_ergebnisse);
 		infos.add(bu_copyright);
 		
@@ -1242,8 +1243,8 @@ class Spiel implements Serializable {
 	int tore_rwe, tore_gegner;
 	GregorianCalendar zeit;
 	
-	static String verein_a = "class=\"link verinsLinkBild\" style=\"\">", verein_e = "</a>",
-			spt = "<td>Spt.", anfang = "<td>", ende = "</td>", ergebnis_a ="\">", ergebnis_e = "&nbsp;";
+	static String verein_a = "<div class=\"kick__v100-gameCell__team__name\">", verein_e = "<span class=\"kick__v100-gameCell__team__info\"></span></div>",
+			spt = "<td>Spt.", zeit_a = "<div class=\"kick__table--gamelist__date-mobile\">", zeit_e = "</div>", ergebnis_a ="<div class=\"kick__v100-scoreBoard__scoreHolder__score\">", ergebnis_e = "</div>";
 	static int z = 1;
 	static enum Ausgang{SIEG, UNENTSCHIEDEN, NIEDERLAGE, AUSSTEHEND};
 	
@@ -1260,50 +1261,58 @@ class Spiel implements Serializable {
 	 * Konstruktor, der aus HTML-Quelltext von kicker.de das Objekt erzeugt
 	 * @param html
 	 */
-	public Spiel(String html) {		
-		String zeit_html, ausw_html, ergebnis_html;
+	public Spiel(String html) {
+		String zeit_html;
+
+		gegner = html;
+		gegner = gegner.substring(gegner.indexOf(verein_a)+verein_a.length());
+		gegner = gegner.substring(0, gegner.indexOf(verein_e));
+		heim = gegner.contains("Erfurt");
+
+		if (heim) {
+			gegner = html.substring(html.indexOf(verein_e));
+			gegner = gegner.substring(gegner.indexOf(verein_a)+verein_a.length());
+			gegner = gegner.substring(0, gegner.indexOf(verein_e));
+		}
 		
-		html = html.substring(html.indexOf(verein_a)+verein_a.length());
-		gegner = html.substring(0, html.indexOf(verein_e));
+		gegner = gegner.trim();
 		
-		html = html.substring(html.indexOf(spt)+spt.length());
-		
-		html = html.substring(html.indexOf(anfang)+anfang.length());
-		zeit_html = html.substring(0, html.indexOf(ende));
+		html = html.substring(html.indexOf(zeit_a)+zeit_a.length());
+		zeit_html = html.substring(0, html.indexOf(zeit_e));
 		zeit_string = zeit_html;
 		
 		if(zeit_html.contains(":")) {
 			zeit = new GregorianCalendar(
-					2000+Integer.parseInt(zeit_html.substring(10,12)),
+					Integer.parseInt(zeit_html.substring(10,14)),
 					Integer.parseInt(zeit_html.substring(7,9))-1,
 					Integer.parseInt(zeit_html.substring(4,6)),
 					Integer.parseInt(zeit_html.substring(13,15)),
 					Integer.parseInt(zeit_html.substring(16)));
 		} else {
 			zeit = new GregorianCalendar(
-					2000+Integer.parseInt(zeit_html.substring(10,12)),
+					Integer.parseInt(zeit_html.substring(10,14)),
 					Integer.parseInt(zeit_html.substring(7,9))-1,
 					Integer.parseInt(zeit_html.substring(4,6)),
 					14,00);
 		}
 		
-		
-		html = html.substring(html.indexOf(anfang)+anfang.length());
-		ausw_html = html.substring(0, html.indexOf(ende));
-		
-		heim = ausw_html.equals("H");
-		
-		html = html.substring(html.indexOf(anfang)+anfang.length());
-		
-		html = html.substring(html.indexOf(ergebnis_a)+ergebnis_a.length());
-		ergebnis_html = html.substring(0, html.indexOf(ergebnis_e));
-		
-		if(ergebnis_html.equals("-:-")) {
+		if (html.contains(ergebnis_a)) {
+			html = html.substring(html.indexOf(ergebnis_a)+ergebnis_a.length());
+			int t1 = Integer.parseInt(html.substring(0, html.indexOf(ergebnis_e)));
+
+			html = html.substring(html.indexOf(ergebnis_a)+ergebnis_a.length());
+			int t2 = Integer.parseInt(html.substring(0, html.indexOf(ergebnis_e)));
+
+			if (heim) {
+				tore_rwe = t1;
+				tore_gegner = t2;
+			} else {
+				tore_rwe = t2;
+				tore_gegner = t1;
+			}
+					} else {
 			tore_rwe = -1;
 			tore_gegner = -1;
-		} else {
-			tore_rwe = Integer.parseInt(ergebnis_html.substring(0,ergebnis_html.indexOf(":")));
-			tore_gegner = Integer.parseInt(ergebnis_html.substring(ergebnis_html.indexOf(":")+1));
 		}
 		
 //		System.out.println("\nGegner: "+gegner);
