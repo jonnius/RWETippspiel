@@ -121,8 +121,9 @@ public class Tippspiel extends JFrame {
 	static Spieler rangliste[];
 	static String pfad;
 	static boolean jar, windows = false, autostart = false;
-	static Color c_mark = new Color(93, 152, 233), c_mark_hg = new Color(180, 202, 233), c_pkt[] = {
-			new Color(200, 200, 200), new Color(255, 255, 150), new Color(150, 255, 255), new Color(100, 255, 100) };
+	static Color c_mark = new Color(93, 152, 233), c_mark_hg = new Color(180, 202, 233),
+			c_pkt[] = { new Color(200, 200, 200), new Color(200, 200, 200), new Color(255, 255, 150),
+					new Color(150, 255, 255), new Color(100, 255, 100) };
 	static Font f_rangliste = new Font("SansSerif", Font.BOLD, 18), f_ergebnisse = new Font("SansSerif", Font.BOLD, 12);
 	static String fehler = "";
 	static TreeMap<GregorianCalendar, String> chat_eigen = new TreeMap<GregorianCalendar, String>(),
@@ -443,11 +444,13 @@ public class Tippspiel extends JFrame {
 			}
 		}
 
+		spt_aktuell = 1;
 		for (int i = 0; i < spieltage; i++) {
-			spt_aktuell = i + 1;
-			if (!spiele[i].mitErgebnis())
-				break;
+			if (spiele[i].mitErgebnis())
+				spt_aktuell = i + 2;
 		}
+		if (spt_aktuell > spieltage)
+			spt_aktuell = spieltage;
 
 		// Andere Tipps lesen
 		File dat[] = d_wolke.listFiles();
@@ -1084,6 +1087,13 @@ public class Tippspiel extends JFrame {
 
 			gbc.gridx++;
 			gbl.setConstraints(
+					label = new JLabel(Integer.toString(rangliste[i].gibAnzahlExakt(spt_anzeige, 4)), JLabel.CENTER),
+					gbc);
+			label.setFont(f_rangliste);
+			tabelle.add(label);
+
+			gbc.gridx++;
+			gbl.setConstraints(
 					label = new JLabel(Integer.toString(rangliste[i].gibAnzahlExakt(spt_anzeige, 3)), JLabel.CENTER),
 					gbc);
 			label.setFont(f_rangliste);
@@ -1092,13 +1102,6 @@ public class Tippspiel extends JFrame {
 			gbc.gridx++;
 			gbl.setConstraints(
 					label = new JLabel(Integer.toString(rangliste[i].gibAnzahlExakt(spt_anzeige, 2)), JLabel.CENTER),
-					gbc);
-			label.setFont(f_rangliste);
-			tabelle.add(label);
-
-			gbc.gridx++;
-			gbl.setConstraints(
-					label = new JLabel(Integer.toString(rangliste[i].gibAnzahlExakt(spt_anzeige, 1)), JLabel.CENTER),
 					gbc);
 			label.setFont(f_rangliste);
 			tabelle.add(label);
@@ -1485,11 +1488,11 @@ class Spiel implements Serializable {
 		if (gibAusgang() == Ausgang.AUSSTEHEND || tipp.gibAusgang() == Ausgang.AUSSTEHEND)
 			return 0;
 		if (tore_rwe == tipp.tore_rwe && tore_gegner == tipp.tore_gegner)
+			return 4;
+		if (tore_rwe - tore_gegner == tipp.tore_rwe - tipp.tore_gegner && gibAusgang() != Ausgang.UNENTSCHIEDEN)
 			return 3;
-		if (tore_rwe - tore_gegner == tipp.tore_rwe - tipp.tore_gegner)
-			return 2;
 		if (gibAusgang() == tipp.gibAusgang())
-			return 1;
+			return 2;
 		return 0;
 	}
 
@@ -1579,21 +1582,21 @@ class Spieler {
 			return true;
 		if (sp.gibPunkte(spieltag) > this.gibPunkte(spieltag))
 			return false;
+		if (sp.gibAnzahlMin(spieltag, 4) < this.gibAnzahlMin(spieltag, 4))
+			return true;
+		if (sp.gibAnzahlMin(spieltag, 4) > this.gibAnzahlMin(spieltag, 4))
+			return false;
 		if (sp.gibAnzahlMin(spieltag, 3) < this.gibAnzahlMin(spieltag, 3))
 			return true;
 		if (sp.gibAnzahlMin(spieltag, 3) > this.gibAnzahlMin(spieltag, 3))
-			return false;
-		if (sp.gibAnzahlMin(spieltag, 2) < this.gibAnzahlMin(spieltag, 2))
-			return true;
-		if (sp.gibAnzahlMin(spieltag, 2) > this.gibAnzahlMin(spieltag, 2))
 			return false;
 		return false; // gleich gut
 	}
 
 	public boolean istGleichGut(Spieler sp) {
-		return sp.gibAnzahlMin(Tippspiel.spt_aktuell, 1) == gibAnzahlMin(Tippspiel.spt_aktuell, 1)
-				&& sp.gibAnzahlMin(Tippspiel.spt_aktuell, 2) == gibAnzahlMin(Tippspiel.spt_aktuell, 2)
-				&& sp.gibAnzahlMin(Tippspiel.spt_aktuell, 3) == gibAnzahlMin(Tippspiel.spt_aktuell, 3);
+		return sp.gibAnzahlMin(Tippspiel.spt_aktuell, 2) == gibAnzahlMin(Tippspiel.spt_aktuell, 2)
+				&& sp.gibAnzahlMin(Tippspiel.spt_aktuell, 3) == gibAnzahlMin(Tippspiel.spt_aktuell, 3)
+				&& sp.gibAnzahlMin(Tippspiel.spt_aktuell, 4) == gibAnzahlMin(Tippspiel.spt_aktuell, 4);
 	}
 
 	public int gibPlatzierung(int spieltag) {
@@ -1612,7 +1615,11 @@ class Spieler {
 	 * @return Punktezahl
 	 */
 	public int gibPunkte(int spieltag) {
-		return gibAnzahlMin(spieltag, 1) + gibAnzahlMin(spieltag, 2) + gibAnzahlMin(spieltag, 3);
+		int p = 0;
+		for (int i = 0; i < spieltag; i++) {
+			p += ergebnisse[i].gibPunkte(tipps[i]);
+		}
+		return p;
 	}
 
 	/**
@@ -1620,8 +1627,8 @@ class Spieler {
 	 * mindestens die angegebene Punktzahl eingebracht haben.
 	 *
 	 * @param spieltag
-	 * @param punkte   - 1 liefert die Anzahl der korrekten Tendenzen, 2 die
-	 *                 korrekten Tordifferenzen und 3 die exakten Ergebnisse
+	 * @param punkte   - 2 liefert die Anzahl der korrekten Tendenzen, 3 die
+	 *                 korrekten Tordifferenzen und 4 die exakten Ergebnisse
 	 * @return Anzahl
 	 */
 	public int gibAnzahlMin(int spieltag, int punkte) {
